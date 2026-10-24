@@ -1,0 +1,38 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AI Job Assistant</title>
+    <link rel="stylesheet" href="{% static 'dist/styles.css' %}" />
+  </head>
+  <body class="h-screen bg-slate-100 flex justify-center">
+    <main class="flex flex-col w-full max-w-3xl h-full bg-white shadow">
+      <header class="px-4 py-3 border-b font-semibold">AI Job Assistant</header>
+      <div id="log" class="flex-1 overflow-y-auto p-4 space-y-3 text-sm"></div>
+      <div class="border-t p-3 flex gap-2 items-center">
+        <input id="file" type="file" accept=".pdf,.docx" class="hidden" />
+        <button
+          id="attach"
+          class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200"
+          title="Upload resume"
+        >
+          📎
+        </button>
+        <input
+          id="msg"
+          class="flex-1 border rounded-lg px-3 py-2"
+          placeholder="Upload your resume, or ask me anything…"
+        />
+        <button
+          id="send"
+          class="px-4 py-2 rounded-lg bg-indigo-600 text-white disabled:opacity-50"
+        >
+          Send
+        </button>
+      </div>
+    </main>
+    <script src="{% static 'dist/main.js' %}"></script>
+  </body>
+</html>
