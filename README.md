@@ -117,6 +117,34 @@ Hidani Job Assistant is an end-to-end job recommendation platform leveraging lar
 
 ---
 
+## APIs Used
+
+### External APIs
+
+| API               | Purpose                                                 | Provider |
+| ----------------- | ------------------------------------------------------- | -------- |
+| Google Gemini API | LLM for resume parsing, chat agent, job recommendations | Google   |
+| Indeed API        | Job listing data (via jobspy library)                   | Indeed   |
+| LinkedIn API      | Job listing data (via jobspy library)                   | LinkedIn |
+
+### Internal APIs
+
+| Endpoint       | Method | Description                                   |
+| -------------- | ------ | --------------------------------------------- |
+| `/api/upload/` | POST   | Upload and parse resume (multipart/form-data) |
+| `/api/chat/`   | POST   | Send message to agent (JSON body)             |
+
+### Agent Tools
+
+| Tool Name          | Purpose                                |
+| ------------------ | -------------------------------------- |
+| `search_jobs`      | Find jobs matching resume with filters |
+| `get_job_details`  | Get full details of a single job       |
+| `apply_to_job`     | Record application for a job           |
+| `get_applications` | List all user applications             |
+
+---
+
 ## Setup Instructions
 
 ### Prerequisites
