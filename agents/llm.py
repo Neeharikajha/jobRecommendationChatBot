@@ -51,3 +51,27 @@ def generate_json(user_text: str, system_prompt: str) -> dict:
     except Exception as e:
         log.error(f"LLM call failed: {type(e).__name__}: {e}")
         raise
+
+
+def generate_text(user_text: str, system_prompt: str) -> str:
+    """Generate free-form text response from Gemini using the system prompt."""
+    try:
+        c = client()
+        response = c.models.generate_content(
+            model=MODEL,
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text=user_text)]
+                )
+            ],
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.2,
+            )
+        )
+        return (response.text or "").strip()
+    except Exception as e:
+        log.error(f"LLM generate_text failed: {type(e).__name__}: {e}")
+        raise
+

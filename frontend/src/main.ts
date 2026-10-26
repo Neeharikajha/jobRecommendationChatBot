@@ -439,6 +439,23 @@ fileInput.addEventListener("change", async () => {
     const card = renderResumeCard(resume);
     addBubble("bot", card);
 
+    // Provide the action guide on first upload
+    const name = resume.name ? `Hi ${esc(resume.name)}! ` : "Hi! ";
+    const introHtml = `
+      <div class="space-y-2 font-sans text-xs">
+        <div class="font-semibold text-white">${name}Here is what I can do:</div>
+        <div class="space-y-1 text-neutral-300">
+          <div><strong class="text-white">Find jobs</strong>: 'Show me frontend developer jobs' or 'Find remote roles'</div>
+          <div><strong class="text-white">Filter</strong>: 'Only remote' or 'Jobs needing Python'</div>
+          <div><strong class="text-white">Suitable roles</strong>: 'What roles would fit this job profile?'</div>
+          <div><strong class="text-white">Apply</strong>: 'Apply to jobs 1, 2, 3'</div>
+          <div><strong class="text-white">Track</strong>: 'Show my applied jobs'</div>
+          <div><strong class="text-white">Clear</strong>: 'Remove all jobs'</div>
+        </div>
+      </div>
+    `;
+    addBubble("bot", introHtml);
+
     resumeBadge.classList.remove("hidden");
     resumeBadge.classList.add("inline-block");
   } catch (e) {
@@ -446,6 +463,7 @@ fileInput.addEventListener("change", async () => {
     addBubble("bot", `<span class="text-neutral-400 font-sans">Could not parse resume: ${esc((e as Error).message)}</span>`);
   }
 });
+
 
 // Welcome message
 addBubble(

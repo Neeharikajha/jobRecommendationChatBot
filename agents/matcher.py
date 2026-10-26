@@ -117,41 +117,69 @@ def search_jobs(
 
         # ── Strict Role type filter ────────────────────────────────────────
         if role_type:
-            rt = role_type.lower()
-            job_rt = _get_role_type(job_title)
-
-            if rt == "frontend":
-                is_fe = (
-                    job_rt == "frontend"
-                    or any(k in job_title_lower for k in ["frontend", "front end", "ui developer", "ui engineer", "react developer", "reactjs", "angular", "vue", "web developer"])
-                )
-                is_not_fs_or_be = not any(k in job_title_lower for k in ["fullstack", "full stack", "backend", "back end"])
-                if not (is_fe and is_not_fs_or_be):
-                    continue
-
-            elif rt == "backend":
-                is_be = (
-                    job_rt == "backend"
-                    or any(k in job_title_lower for k in ["backend", "back end", "python developer", "api developer", "django", "fastapi", "node.js developer", "java developer"])
-                )
-                is_not_fs = not any(k in job_title_lower for k in ["fullstack", "full stack"])
-                if not (is_be and is_not_fs):
-                    continue
-
-            elif rt == "fullstack":
-                is_fs = (
-                    job_rt == "fullstack"
-                    or any(k in job_title_lower for k in ["fullstack", "full stack"])
-                )
-                if not is_fs:
-                    continue
-
-            elif rt == "devops":
-                if not (job_rt == "devops" or any(k in job_title_lower for k in ["devops", "sre", "cloud", "infrastructure"])):
-                    continue
+            # role_type can be a list, or comma-separated string like 'frontend,fullstack'
+            if isinstance(role_type, str):
+                wanted_rts = [r.strip().lower() for r in role_type.split(",") if r.strip()]
+            elif isinstance(role_type, (list, set, tuple)):
+                wanted_rts = [str(r).strip().lower() for r in role_type if r]
             else:
-                if rt not in job_title_lower:
-                    continue
+                wanted_rts = [str(role_type).lower()]
+
+            job_rt = _get_role_type(job_title)
+            matches_any_role = False
+
+            for rt in wanted_rts:
+                if rt == "frontend":
+                    is_fe = (
+                        job_rt == "frontend"
+                        or any(k in job_title_lower for k in ["frontend", "front end", "ui developer", "ui engineer", "react developer", "reactjs", "angular", "vue", "web developer"])
+                    )
+                    is_not_fs_or_be = not any(k in job_title_lower for k in ["fullstack", "full stack", "backend", "back end"])
+                    if is_fe and is_not_fs_or_be:
+                        matches_any_role = True
+                        break
+
+                elif rt == "backend":
+                    is_be = (
+                        job_rt == "backend"
+                        or any(k in job_title_lower for k in ["backend", "back end", "python developer", "api developer", "django", "fastapi", "node.js developer", "java developer"])
+                    )
+                    is_not_fs = not any(k in job_title_lower for k in ["fullstack", "full stack"])
+                    if is_be and is_not_fs:
+                        matches_any_role = True
+                        break
+
+                elif rt == "fullstack":
+                    is_fs = (
+                        job_rt == "fullstack"
+                        or any(k in job_title_lower for k in ["fullstack", "full stack"])
+                    )
+                    if is_fs:
+                        matches_any_role = True
+                        break
+
+                elif rt == "devops":
+                    if job_rt == "devops" or any(k in job_title_lower for k in ["devops", "sre", "cloud", "infrastructure"]):
+                        matches_any_role = True
+                        break
+
+                elif rt == "data":
+                    if job_rt == "data" or any(k in job_title_lower for k in ["data", "machine learning", "ml", "ai"]):
+                        matches_any_role = True
+                        break
+
+                elif rt == "mobile":
+                    if job_rt == "mobile" or any(k in job_title_lower for k in ["mobile", "android", "ios", "flutter", "react native"]):
+                        matches_any_role = True
+                        break
+
+                else:
+                    if rt in job_title_lower:
+                        matches_any_role = True
+                        break
+
+            if not matches_any_role:
+                continue
 
         # ── Remote filter ─────────────────────────────────────────────────
         if remote is not None and job.get("remote") != remote:

@@ -2,11 +2,13 @@ import logging
 import re
 from chat.models import Resume, Message, Application
 from .matcher import search_jobs, get_job
+from .llm import generate_text
 
 log = logging.getLogger(__name__)
 
 _SESSION_JOB_MAP  = "last_job_map"   # {display_num_str: real_job_id_int}
 _SESSION_JOB_LIST = "last_job_list"  # [job_id, ...]
+_SESSION_APP_MAP  = "last_app_map"   # {display_num_str: application_db_id}
 
 
 # Intent classifier
@@ -47,9 +49,9 @@ def classify_intent(user_text: str) -> str:
 
     if any(w in text for w in [
         "search", "find", "show", "give", "get", "recommend", "suggest",
-        "jobs", "roles", "position", "opportunities", "openings",
+        "jobs", "job", "roles", "role", "doles", "dole", "position", "opportunities", "openings",
         "developer", "engineer", "frontend", "backend", "fullstack",
-        "full stack", "remote", "python", "react", "java", "related to",
+        "full stack", "frotned", "frotnend", "frontned", "remote", "python", "react", "java", "related to",
         "profile", "match", "more", "different"
     ]):
         if not any(w in text for w in ["applied", "application history"]):
@@ -70,29 +72,73 @@ def extract_limit(user_text: str) -> int:
     text = user_text.lower()
     for pattern in [
         r'only\s+(\d+)',
-        r'(\d+)\s+(?:jobs?|more|results?|positions?|roles?|opportunities?)',
-        r'(?:give|show|find|search)\s+(?:me\s+)?(\d+)',
+        r'(\d+)\s+(?:jobs?|more|results?|positions?|roles?|doles?|opportunities?)',
+        r'(?:give|show|find|search|suggest)\s+(?:me\s+)?(?:just\s+)?(?:only\s+)?(\d+)',
+        r'(?:roles?|doles?|jobs?|please)[^\d]{1,10}(\d+)\b',
+        r'\b(\d+)\s*$',
     ]:
         m = re.search(pattern, text)
         if m:
-            return int(m.group(1))
+            val = int(m.group(1))
+            if 1 <= val <= 50:
+                return val
     return 10
 
 
 def extract_role_type(user_text: str) -> str | None:
     t = user_text.lower()
-    if any(k in t for k in ["frontend", "front end", "ui developer", "react developer"]):
-        return "frontend"
-    if any(k in t for k in ["backend", "back end"]):
-        return "backend"
-    if any(k in t for k in ["fullstack", "full stack"]):
-        return "fullstack"
-    if any(k in t for k in ["devops", "sre", "cloud engineer"]):
-        return "devops"
-    if any(k in t for k in ["data science", "machine learning", "ml engineer", "ai engineer"]):
-        return "data"
-    if any(k in t for k in ["mobile", "android", "ios", "flutter"]):
-        return "mobile"
+    words = re.findall(r'[a-z]+', t)
+
+    detected: list[str] = []
+
+    # Check for frontend (with typo tolerance e.g. frotned, frotnend, frontned, fontend)
+    is_frontend = (
+        any(k in t for k in ["frontend", "front end", "ui developer", "react developer", "front-end"])
+        or any(w in ["frotned", "frotnend", "frontned", "fontend", "frntend", "frondend"] for w in words)
+    )
+
+    # Check for fullstack
+    is_fullstack = (
+        any(k in t for k in ["fullstack", "full stack", "full-stack"])
+        or any(w in ["fulstack", "fullstck", "fullstak"] for w in words)
+    )
+
+    # Check for backend
+    is_backend = (
+        any(k in t for k in ["backend", "back end", "back-end"])
+        or any(w in ["bakend", "backnd"] for w in words)
+    )
+
+    # Check for devops
+    is_devops = (
+        any(k in t for k in ["devops", "sre", "cloud engineer"])
+    )
+
+    # Check for data
+    is_data = (
+        any(k in t for k in ["data science", "machine learning", "ml engineer", "ai engineer"])
+    )
+
+    # Check for mobile
+    is_mobile = (
+        any(k in t for k in ["mobile", "android", "ios", "flutter", "react native"])
+    )
+
+    if is_frontend:
+        detected.append("frontend")
+    if is_fullstack:
+        detected.append("fullstack")
+    if is_backend:
+        detected.append("backend")
+    if is_devops:
+        detected.append("devops")
+    if is_data:
+        detected.append("data")
+    if is_mobile:
+        detected.append("mobile")
+
+    if detected:
+        return ",".join(detected)
     return None
 
 
@@ -194,31 +240,50 @@ def run_agent(sid: str, user_text: str, request=None) -> dict:
             text_lower = user_text.lower()
             if any(w in text_lower for w in ["all", "everything", "history", "queue", "applied", "all jobs"]):
                 deleted_count, _ = Application.objects.filter(session_key=sid).delete()
+                if session is not None:
+                    session[_SESSION_APP_MAP] = {}
+                    session.modified = True
                 result["reply"] = f"Removed all {deleted_count} job application(s) from your applied records."
             else:
                 display_ids = extract_display_ids(user_text)
                 if not display_ids:
                     result["reply"] = "Specify job numbers to remove, or say 'remove all jobs'. Example: 'remove 1, 2'"
                 else:
-                    removed, not_applied, not_found = [], [], []
+                    # Get recent applications ordered as shown to the user
+                    recent_apps = list(Application.objects.filter(session_key=sid).order_by("-applied_at"))
+                    app_map = session.get(_SESSION_APP_MAP, {}) if session else {}
+
+                    removed, not_applied = [], []
                     for d_id in display_ids:
-                        real_id = job_map.get(str(d_id), d_id)
-                        try:
-                            app = Application.objects.get(session_key=sid, job_id=real_id)
-                            clean_t = app.job_title.replace(" - ", " : ").replace("-", " ")
-                            removed.append(f"{clean_t} at {app.company}")
-                            app.delete()
-                        except Application.DoesNotExist:
-                            (not_applied if get_job(real_id) else not_found).append(d_id)
+                        app_to_delete = None
+                        # Priority 1: Check by list position in last shown applications (1-indexed)
+                        # Check session app map first if exists
+                        if str(d_id) in app_map:
+                            target_app_id = app_map[str(d_id)]
+                            app_to_delete = Application.objects.filter(id=target_app_id, session_key=sid).first()
+
+                        # Priority 2: 1-indexed position in current application history list
+                        if not app_to_delete and 1 <= d_id <= len(recent_apps):
+                            app_to_delete = recent_apps[d_id - 1]
+
+                        # Priority 3: Fall back to job_id if matched from search job_map
+                        if not app_to_delete:
+                            real_job_id = job_map.get(str(d_id), d_id)
+                            app_to_delete = Application.objects.filter(session_key=sid, job_id=real_job_id).first()
+
+                        if app_to_delete:
+                            clean_t = app_to_delete.job_title.replace(" - ", " : ").replace("-", " ")
+                            removed.append(f"{clean_t} at {app_to_delete.company}")
+                            app_to_delete.delete()
+                        else:
+                            not_applied.append(d_id)
 
                     lines = []
                     if removed:
                         lines.append(f"Removed {len(removed)} application(s):")
                         lines += [f"  * {r}" for r in removed]
                     if not_applied:
-                        lines.append(f"You had not applied to: {', '.join(map(str, not_applied))}")
-                    if not_found:
-                        lines.append(f"Job numbers not found: {', '.join(map(str, not_found))}")
+                        lines.append(f"Application number(s) not found: {', '.join(map(str, not_applied))}")
                     result["reply"] = "\n".join(lines) or "Nothing to remove."
 
         # View applications
@@ -227,6 +292,12 @@ def run_agent(sid: str, user_text: str, request=None) -> dict:
             if not apps.exists():
                 result["reply"] = "No applications yet. Find jobs and apply!"
             else:
+                apps_list = list(apps[:20])
+                if session is not None:
+                    # Store 1-indexed mapping to application db ids
+                    session[_SESSION_APP_MAP] = {str(i + 1): a.id for i, a in enumerate(apps_list)}
+                    session.modified = True
+
                 result["type"] = "applications"
                 result["applications"] = [
                     {
@@ -236,7 +307,7 @@ def run_agent(sid: str, user_text: str, request=None) -> dict:
                         "status": a.status,
                         "date": a.applied_at.strftime("%d %b %Y"),
                     }
-                    for i, a in enumerate(apps[:20])
+                    for i, a in enumerate(apps_list)
                 ]
                 result["reply"] = f"You have {apps.count()} application(s) on record."
 
@@ -358,7 +429,7 @@ def run_agent(sid: str, user_text: str, request=None) -> dict:
                         f"To apply, type: 'apply to {apply_hint}'"
                     )
 
-        # Fallback
+        # Fallback / Question answering
         else:
             if not resume_data:
                 result["reply"] = (
@@ -367,20 +438,47 @@ def run_agent(sid: str, user_text: str, request=None) -> dict:
                     "apply to positions, and track your applications."
                 )
             else:
-                name = resume_data.get("name", "")
-                exp = resume_data.get("experience_years", 0)
-                skills_preview = ", ".join((resume_data.get("skills") or [])[:5])
-                greeting = f"Hi {name}! " if name else ""
-                result["reply"] = (
-                    f"{greeting}Here is what I can do:\n\n"
-                    "  Find jobs: 'Show me frontend developer jobs' or 'Find remote roles'\n"
-                    "  Filter: 'Only remote' or 'Jobs needing Python'\n"
-                    "  Suitable roles: 'What roles would fit this job profile?'\n"
-                    "  Apply: 'Apply to jobs 1, 2, 3'\n"
-                    "  Track: 'Show my applied jobs'\n"
-                    "  Clear: 'Remove all jobs'\n\n"
-                    f"Profile: {exp} year(s) experience | Skills: {skills_preview}"
+                # Check if this is the very first interaction for this session
+                user_msg_count = Message.objects.filter(session_key=sid, role="user").count()
+                
+                # If the user is asking a specific question (e.g. experience, skills, education, projects, etc.)
+                system_instruction = (
+                    "You are a concise AI career assistant. You are given a user's resume data. "
+                    "Answer the user's specific question directly and highlight the main answer (e.g., '1.5 years of experience', or key skill names). "
+                    "Keep your answer to 1 to 2 short sentences. Do NOT list the general menu of actions or help text. "
+                    "Never use hyphens (use ':' or '/' instead). Do not use emojis."
                 )
+                prompt = f"Resume data:\n{resume_data}\n\nUser question:\n{user_text}"
+                try:
+                    answer = generate_text(prompt, system_instruction)
+                    # Clean any accidental hyphens or emojis
+                    answer = answer.replace(" - ", " : ").replace("-", " ")
+                    result["reply"] = answer
+                except Exception as ex:
+                    log.error(f"Fallback LLM error: {ex}")
+                    # Direct rule-based answer for common questions like experience
+                    tl = user_text.lower()
+                    if any(w in tl for w in ["exp", "experience", "how many years", "how long"]):
+                        exp = resume_data.get("experience_years", 0)
+                        result["reply"] = f"{exp} year(s) of professional experience."
+                    elif any(w in tl for w in ["skill", "tech", "stack"]):
+                        skills = ", ".join(resume_data.get("skills", []))
+                        result["reply"] = f"Skills detected: {skills}"
+                    else:
+                        if user_msg_count <= 1:
+                            name = resume_data.get("name", "")
+                            greeting = f"Hi {name}! " if name else ""
+                            result["reply"] = (
+                                f"{greeting}Here is what I can do:\n\n"
+                                "  Find jobs: 'Show me frontend developer jobs' or 'Find remote roles'\n"
+                                "  Filter: 'Only remote' or 'Jobs needing Python'\n"
+                                "  Suitable roles: 'What roles would fit this job profile?'\n"
+                                "  Apply: 'Apply to jobs 1, 2, 3'\n"
+                                "  Track: 'Show my applied jobs'\n"
+                                "  Clear: 'Remove all jobs'"
+                            )
+                        else:
+                            result["reply"] = "Could you please rephrase your request?"
 
     except Exception as e:
         log.exception(f"Agent error: {e}")
