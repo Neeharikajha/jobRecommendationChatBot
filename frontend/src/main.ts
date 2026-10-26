@@ -1,6 +1,6 @@
 import type { Resume } from "./types";
 
-// ─── DOM refs ────────────────────────────────────────────────────────────────
+// DOM refs
 const log = document.getElementById("log") as HTMLDivElement;
 const input = document.getElementById("msg-input") as HTMLInputElement;
 const sendBtn = document.getElementById("send-btn") as HTMLButtonElement;
@@ -8,7 +8,7 @@ const fileInput = document.getElementById("file-input") as HTMLInputElement;
 const attachBtn = document.getElementById("attach-btn") as HTMLButtonElement;
 const resumeBadge = document.getElementById("resume-badge") as HTMLSpanElement;
 
-// ─── API ─────────────────────────────────────────────────────────────────────
+// API
 async function apiParse(res: Response): Promise<unknown> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as Record<string, string>).error ?? `Error ${res.status}`);
@@ -62,7 +62,7 @@ async function sendChat(message: string): Promise<AgentResult> {
   return data as AgentResult;
 }
 
-// ─── Rendering helpers ────────────────────────────────────────────────────────
+// Rendering helpers
 function esc(s: string): string {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -79,7 +79,7 @@ function addBubble(role: "user" | "bot", content: string | HTMLElement): HTMLDiv
   if (role === "user") {
     d.className = "flex justify-end";
     const inner = document.createElement("div");
-    inner.className = "max-w-xl bg-neutral-100 text-neutral-950 font-normal text-sm px-4 py-2.5 rounded-lg border border-neutral-300 shadow-sm";
+    inner.className = "max-w-xl bg-neutral-100 text-neutral-950 font-normal text-sm px-4 py-2.5 rounded-lg border border-neutral-300 shadow-sm font-sans";
     if (typeof content === "string") {
       inner.innerHTML = content;
     } else {
@@ -89,7 +89,7 @@ function addBubble(role: "user" | "bot", content: string | HTMLElement): HTMLDiv
   } else {
     d.className = "flex justify-start w-full";
     const inner = document.createElement("div");
-    inner.className = "max-w-2xl w-full bg-neutral-950 text-neutral-200 text-sm p-4 rounded-lg border border-neutral-800 leading-relaxed";
+    inner.className = "max-w-2xl w-full bg-neutral-950 text-neutral-200 text-sm p-4 rounded-lg border border-neutral-800 leading-relaxed font-sans";
     if (typeof content === "string") {
       inner.innerHTML = content;
     } else {
@@ -107,11 +107,11 @@ function thinkingEl(): HTMLDivElement {
   const d = document.createElement("div");
   d.className = "flex justify-start w-full";
   d.innerHTML = `
-    <div class="bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 flex items-center gap-1.5">
+    <div class="bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-3 flex items-center gap-1.5 font-sans">
       <span class="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-pulse"></span>
       <span class="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-pulse delay-100"></span>
       <span class="w-1.5 h-1.5 rounded-full bg-neutral-400 animate-pulse delay-200"></span>
-      <span class="text-xs text-neutral-400 font-mono ml-2 uppercase tracking-widest">Thinking</span>
+      <span class="text-xs text-neutral-400 ml-2 uppercase tracking-widest font-sans">Thinking</span>
     </div>
   `;
   log.appendChild(d);
@@ -119,14 +119,15 @@ function thinkingEl(): HTMLDivElement {
   return d;
 }
 
-/** Format plain text: bold **x**, line breaks, no raw markdown underscores */
+/** Format plain text: bold **x**, line breaks, replace hyphens */
 function formatText(text: string): string {
   return esc(text)
+    .replace(/—/g, ":")
     .replace(/\*\*(.+?)\*\*/g, "<strong class='text-white font-semibold'>$1</strong>")
     .replace(/\n/g, "<br>");
 }
 
-// ─── Resume Card ──────────────────────────────────────────────────────────────
+// Resume Card
 function renderResumeCard(r: Resume): HTMLDivElement {
   const initials = (r.name || "?")
     .split(" ")
@@ -138,7 +139,7 @@ function renderResumeCard(r: Resume): HTMLDivElement {
   const skills = (r.skills || [])
     .map(
       (s: string) =>
-        `<span class="text-xs px-2 py-0.5 rounded border border-neutral-700 bg-neutral-900 text-neutral-300 font-mono">${esc(s)}</span>`
+        `<span class="text-xs px-2 py-0.5 rounded border border-neutral-700 bg-neutral-900 text-neutral-300 font-sans">${esc(s)}</span>`
     )
     .join("");
 
@@ -149,15 +150,15 @@ function renderResumeCard(r: Resume): HTMLDivElement {
   const proj_list = (r.projects || []).map((p: string) => `<li class="text-neutral-400 text-xs">${esc(p)}</li>`).join("");
 
   const card = document.createElement("div");
-  card.className = "border border-neutral-800 bg-neutral-950 rounded-lg p-5 space-y-4 w-full";
+  card.className = "border border-neutral-800 bg-neutral-950 rounded-lg p-5 space-y-4 w-full font-sans";
   card.innerHTML = `
     <div class="flex items-center gap-3 pb-3 border-b border-neutral-800">
-      <div class="w-10 h-10 rounded bg-white text-black font-bold flex items-center justify-center text-sm uppercase">
+      <div class="w-10 h-10 rounded bg-white text-black font-bold flex items-center justify-center text-sm uppercase font-sans">
         ${initials}
       </div>
       <div>
-        <div class="text-base font-semibold text-white tracking-tight">${esc(r.name || "Candidate Resume")}</div>
-        <div class="text-xs text-neutral-400">${esc(r.designation || "Applicant")}</div>
+        <div class="text-base font-semibold text-white tracking-tight font-sans">${esc(r.name || "Candidate Resume")}</div>
+        <div class="text-xs text-neutral-400 font-sans">${esc(r.designation || "Applicant")}</div>
       </div>
     </div>
 
@@ -166,20 +167,20 @@ function renderResumeCard(r: Resume): HTMLDivElement {
         r.email || r.phone
           ? `
       <div class="flex flex-col sm:flex-row sm:gap-4">
-        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px]">Contact</span>
-        <span class="text-neutral-300">${esc(r.email || "")}${r.email && r.phone ? " · " : ""}${esc(r.phone || "")}</span>
+        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px] font-sans">Contact</span>
+        <span class="text-neutral-300 font-sans">${esc(r.email || "")}${r.email && r.phone ? " / " : ""}${esc(r.phone || "")}</span>
       </div>`
           : ""
       }
       <div class="flex flex-col sm:flex-row sm:gap-4">
-        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px]">Experience</span>
-        <span class="text-neutral-300">${r.experience_years} year(s)</span>
+        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px] font-sans">Experience</span>
+        <span class="text-neutral-300 font-sans">${r.experience_years} year(s)</span>
       </div>
       ${
         skills
           ? `
       <div class="flex flex-col sm:flex-row sm:gap-4">
-        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px]">Skills</span>
+        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px] font-sans">Skills</span>
         <div class="flex flex-wrap gap-1.5 flex-1">${skills}</div>
       </div>`
           : ""
@@ -188,8 +189,8 @@ function renderResumeCard(r: Resume): HTMLDivElement {
         exp_list
           ? `
       <div class="flex flex-col sm:flex-row sm:gap-4">
-        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px]">Work</span>
-        <ul class="list-disc list-inside space-y-1 flex-1">${exp_list}</ul>
+        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px] font-sans">Work</span>
+        <ul class="list-disc list-inside space-y-1 flex-1 font-sans">${exp_list}</ul>
       </div>`
           : ""
       }
@@ -197,8 +198,8 @@ function renderResumeCard(r: Resume): HTMLDivElement {
         edu_list
           ? `
       <div class="flex flex-col sm:flex-row sm:gap-4">
-        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px]">Education</span>
-        <ul class="list-disc list-inside space-y-1 flex-1">${edu_list}</ul>
+        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px] font-sans">Education</span>
+        <ul class="list-disc list-inside space-y-1 flex-1 font-sans">${edu_list}</ul>
       </div>`
           : ""
       }
@@ -206,57 +207,57 @@ function renderResumeCard(r: Resume): HTMLDivElement {
         proj_list
           ? `
       <div class="flex flex-col sm:flex-row sm:gap-4">
-        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px]">Projects</span>
-        <ul class="list-disc list-inside space-y-1 flex-1">${proj_list}</ul>
+        <span class="w-24 text-neutral-500 font-medium uppercase tracking-wider text-[11px] font-sans">Projects</span>
+        <ul class="list-disc list-inside space-y-1 flex-1 font-sans">${proj_list}</ul>
       </div>`
           : ""
       }
     </div>
 
-    <div class="pt-3 border-t border-neutral-800 text-[11px] text-neutral-400 font-mono uppercase tracking-wider">
-      Resume parsed successfully. Ask me to find matching jobs or suggest roles.
+    <div class="pt-3 border-t border-neutral-800 text-[11px] text-neutral-400 uppercase tracking-wider font-sans">
+      Resume parsed successfully. Ask me to find matching jobs or suggest suitable roles.
     </div>
   `;
   return card;
 }
 
-// ─── Job Cards ────────────────────────────────────────────────────────────────
+// Job Cards
 function renderJobCard(job: JobData): HTMLDivElement {
   const card = document.createElement("div");
-  card.className = "border border-neutral-800 bg-neutral-950 rounded-lg overflow-hidden transition-all duration-150 hover:border-neutral-600";
+  card.className = "border border-neutral-800 bg-neutral-950 rounded-lg overflow-hidden transition-all duration-150 hover:border-neutral-600 font-sans";
 
   const remoteBadge = job.remote
-    ? `<span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded border border-neutral-700 bg-neutral-900 text-neutral-300">Remote</span>`
+    ? `<span class="text-[10px] uppercase px-2 py-0.5 rounded border border-neutral-700 bg-neutral-900 text-neutral-300 font-sans">Remote</span>`
     : "";
   const expBadge = job.experience_required
-    ? `<span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded border border-neutral-800 bg-black text-neutral-400">${esc(String(job.experience_required))}</span>`
+    ? `<span class="text-[10px] uppercase px-2 py-0.5 rounded border border-neutral-800 bg-black text-neutral-400 font-sans">${esc(String(job.experience_required))}</span>`
     : "";
   const skills = (job.skills || [])
     .slice(0, 8)
     .map(
       (s: string) =>
-        `<span class="text-xs px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-300 font-mono">${esc(s)}</span>`
+        `<span class="text-xs px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-300 font-sans">${esc(s)}</span>`
     )
     .join("");
   const desc = job.description_snippet
     ? `<div class="space-y-1">
-        <div class="text-[11px] uppercase tracking-wider text-neutral-500 font-medium">Description</div>
-        <div class="text-xs text-neutral-300 leading-relaxed">${esc(job.description_snippet)}…</div>
+        <div class="text-[11px] uppercase tracking-wider text-neutral-500 font-medium font-sans">Description</div>
+        <div class="text-xs text-neutral-300 leading-relaxed font-sans">${esc(job.description_snippet)}...</div>
        </div>`
     : "";
 
   card.innerHTML = `
     <div class="jc-summary p-4 flex items-start justify-between cursor-pointer select-none bg-neutral-950 hover:bg-neutral-900/50 transition-colors">
       <div class="space-y-1">
-        <div class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">Job ${job.display_id}</div>
-        <div class="text-sm font-semibold text-white tracking-tight">${esc(job.title)}</div>
-        <div class="text-xs text-neutral-400 font-normal">${esc(job.company)} · ${esc(job.location)}</div>
+        <div class="text-[10px] text-neutral-500 uppercase tracking-widest font-sans">Job ${job.display_id}</div>
+        <div class="text-sm font-semibold text-white tracking-tight font-sans">${esc(job.title)}</div>
+        <div class="text-xs text-neutral-400 font-normal font-sans">${esc(job.company)} / ${esc(job.location)}</div>
         <div class="flex items-center gap-1.5 pt-1">
           ${remoteBadge}
           ${expBadge}
         </div>
       </div>
-      <div class="jc-chevron text-neutral-400 text-sm font-mono transition-transform duration-200">
+      <div class="jc-chevron text-neutral-400 text-sm font-sans transition-transform duration-200">
         &#8595;
       </div>
     </div>
@@ -265,7 +266,7 @@ function renderJobCard(job: JobData): HTMLDivElement {
       ${
         skills
           ? `<div class="space-y-1.5">
-        <div class="text-[11px] uppercase tracking-wider text-neutral-500 font-medium">Required Skills</div>
+        <div class="text-[11px] uppercase tracking-wider text-neutral-500 font-medium font-sans">Required Skills</div>
         <div class="flex flex-wrap gap-1">${skills}</div>
       </div>`
           : ""
@@ -273,10 +274,10 @@ function renderJobCard(job: JobData): HTMLDivElement {
       <div class="flex items-center gap-2 pt-2 border-t border-neutral-900">
         ${
           job.source_link
-            ? `<button class="jc-link-btn px-3 py-1.5 bg-white text-black hover:bg-neutral-200 text-xs font-semibold rounded uppercase tracking-wider transition-colors cursor-pointer" data-link="${esc(job.source_link)}">Apply on site</button>`
+            ? `<button class="jc-link-btn px-3 py-1.5 bg-white text-black hover:bg-neutral-200 text-xs font-semibold rounded uppercase tracking-wider transition-colors cursor-pointer font-sans" data-link="${esc(job.source_link)}">Apply on site</button>`
             : ""
         }
-        <button class="jc-apply-btn px-3 py-1.5 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-semibold rounded uppercase tracking-wider transition-colors cursor-pointer" data-apply="${job.display_id}">Mark as applied</button>
+        <button class="jc-apply-btn px-3 py-1.5 border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 text-xs font-semibold rounded uppercase tracking-wider transition-colors cursor-pointer font-sans" data-apply="${job.display_id}">Mark as applied</button>
       </div>
     </div>
   `;
@@ -298,7 +299,7 @@ function renderJobCard(job: JobData): HTMLDivElement {
     scrollBottom();
   });
 
-  // Apply on site button → open source link
+  // Apply on site button -> open source link
   card.querySelectorAll<HTMLButtonElement>("[data-link]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -306,7 +307,7 @@ function renderJobCard(job: JobData): HTMLDivElement {
     });
   });
 
-  // Mark as applied → send chat command
+  // Mark as applied -> send chat command
   card.querySelectorAll<HTMLButtonElement>("[data-apply]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -323,35 +324,35 @@ function renderJobCard(job: JobData): HTMLDivElement {
 
 function renderJobs(jobs: JobData[], header: string): HTMLDivElement {
   const wrapper = document.createElement("div");
-  wrapper.className = "space-y-3 w-full";
-  wrapper.innerHTML = `<div class="text-xs font-mono uppercase tracking-wider text-neutral-400 border-b border-neutral-800 pb-2">${esc(header)}</div>`;
+  wrapper.className = "space-y-3 w-full font-sans";
+  wrapper.innerHTML = `<div class="text-xs uppercase tracking-wider text-neutral-400 border-b border-neutral-800 pb-2 font-sans">${esc(header)}</div>`;
   jobs.forEach((j) => wrapper.appendChild(renderJobCard(j)));
   return wrapper;
 }
 
-// ─── Applications Table ───────────────────────────────────────────────────────
+// Applications Table
 function renderApplications(apps: AppData[], header: string): HTMLDivElement {
   const rows = apps
     .map(
       (a) => `
-    <tr class="border-b border-neutral-800/60 hover:bg-neutral-900/40 text-xs">
-      <td class="p-3 text-neutral-500 font-mono">${a.index}</td>
-      <td class="p-3"><strong class="text-white">${esc(a.title)}</strong><br><span class="text-neutral-400 text-[11px]">${esc(a.company)}</span></td>
-      <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-mono border border-neutral-700 bg-neutral-900 text-neutral-300 uppercase">${esc(a.status)}</span></td>
-      <td class="p-3 text-neutral-400 font-mono text-[11px]">${esc(a.date)}</td>
+    <tr class="border-b border-neutral-800/60 hover:bg-neutral-900/40 text-xs font-sans">
+      <td class="p-3 text-neutral-500 font-sans">${a.index}</td>
+      <td class="p-3 font-sans"><strong class="text-white">${esc(a.title)}</strong><br><span class="text-neutral-400 text-[11px]">${esc(a.company)}</span></td>
+      <td class="p-3 font-sans"><span class="px-2 py-0.5 rounded text-[10px] border border-neutral-700 bg-neutral-900 text-neutral-300 uppercase">${esc(a.status)}</span></td>
+      <td class="p-3 text-neutral-400 text-[11px] font-sans">${esc(a.date)}</td>
     </tr>`
     )
     .join("");
 
   const wrapper = document.createElement("div");
-  wrapper.className = "w-full space-y-3 border border-neutral-800 rounded-lg p-4 bg-neutral-950";
+  wrapper.className = "w-full space-y-3 border border-neutral-800 rounded-lg p-4 bg-neutral-950 font-sans";
   wrapper.innerHTML = `
-    <div class="text-xs font-mono uppercase tracking-wider text-neutral-400 border-b border-neutral-800 pb-2">${esc(header)}</div>
+    <div class="text-xs uppercase tracking-wider text-neutral-400 border-b border-neutral-800 pb-2 font-sans">${esc(header)}</div>
     <div class="overflow-x-auto">
-      <table class="w-full text-left border-collapse">
+      <table class="w-full text-left border-collapse font-sans">
         <thead>
-          <tr class="border-b border-neutral-800 text-[11px] uppercase tracking-wider text-neutral-500">
-            <th class="p-3 font-semibold">#</th>
+          <tr class="border-b border-neutral-800 text-[11px] uppercase tracking-wider text-neutral-500 font-sans">
+            <th class="p-3 font-semibold">Number</th>
             <th class="p-3 font-semibold">Position</th>
             <th class="p-3 font-semibold">Status</th>
             <th class="p-3 font-semibold">Date</th>
@@ -364,7 +365,7 @@ function renderApplications(apps: AppData[], header: string): HTMLDivElement {
   return wrapper;
 }
 
-// ─── Main chat handler ────────────────────────────────────────────────────────
+// Main chat handler
 let isBusy = false;
 
 async function ask(text: string, showUser = true): Promise<void> {
@@ -399,7 +400,7 @@ async function ask(text: string, showUser = true): Promise<void> {
     }
   } catch (e) {
     thinking.remove();
-    addBubble("bot", `<span class="text-neutral-400 font-mono">${esc((e as Error).message)}</span>`);
+    addBubble("bot", `<span class="text-neutral-400 font-sans">${esc((e as Error).message)}</span>`);
   } finally {
     isBusy = false;
     sendBtn.disabled = false;
@@ -407,7 +408,7 @@ async function ask(text: string, showUser = true): Promise<void> {
   }
 }
 
-// ─── Events ───────────────────────────────────────────────────────────────────
+// Events
 sendBtn.addEventListener("click", () => {
   const text = input.value.trim();
   if (!text || isBusy) return;
@@ -434,28 +435,27 @@ fileInput.addEventListener("change", async () => {
   try {
     const resume = await uploadResume(file);
 
-    // Show parsed resume card — do NOT auto-search
     thinking.remove();
     const card = renderResumeCard(resume);
     addBubble("bot", card);
 
-    // Show resume badge in header
     resumeBadge.classList.remove("hidden");
     resumeBadge.classList.add("inline-block");
   } catch (e) {
     thinking.remove();
-    addBubble("bot", `<span class="text-neutral-400 font-mono">Could not parse resume: ${esc((e as Error).message)}</span>`);
+    addBubble("bot", `<span class="text-neutral-400 font-sans">Could not parse resume: ${esc((e as Error).message)}</span>`);
   }
 });
 
-// ─── Welcome ──────────────────────────────────────────────────────────────────
+// Welcome message
 addBubble(
   "bot",
   "Welcome to Hidani Job Assistant.<br><br>" +
     "Upload your resume using the paperclip icon or ask commands below:<br>" +
-    "<strong class='text-white'>Find jobs</strong> — 'Show me frontend developer jobs'<br>" +
-    "<strong class='text-white'>Filter</strong> — 'Only remote roles' or 'Jobs needing Python'<br>" +
-    "<strong class='text-white'>Suggest roles</strong> — 'What roles can I apply to?'<br>" +
-    "<strong class='text-white'>Apply</strong> — 'Apply to jobs 1, 2, 3'<br>" +
-    "<strong class='text-white'>Track</strong> — 'Show my applied jobs'"
+    "<strong class='text-white'>Find jobs</strong> : 'Show me frontend developer jobs'<br>" +
+    "<strong class='text-white'>Filter</strong> : 'Only remote roles' or 'Jobs needing Python'<br>" +
+    "<strong class='text-white'>Suggest roles</strong> : 'What roles would fit this job profile?'<br>" +
+    "<strong class='text-white'>Apply</strong> : 'Apply to jobs 1, 2, 3'<br>" +
+    "<strong class='text-white'>Track</strong> : 'Show my applied jobs'<br>" +
+    "<strong class='text-white'>Clear</strong> : 'Remove all jobs'"
 );

@@ -4,11 +4,31 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="AI-powered job assistant — upload your resume and find matching jobs instantly." />
+    <meta name="description" content="AI powered job assistant : upload your resume and find matching jobs instantly." />
     <title>Hidani Job Assistant</title>
-    <!-- Fallback Tailwind CDN so styles render instantly with zero caching delays -->
+    <!-- Google Fonts: Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Tailwind CDN fallback -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Poppins', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
     <link rel="stylesheet" href="{% static 'dist/styles.css' %}" />
+    <style>
+      body, input, button, table, div, span, p, h1, h2, h3 {
+        font-family: 'Poppins', sans-serif !important;
+      }
+    </style>
   </head>
   <body class="h-full bg-black text-neutral-100 flex flex-col font-sans">
     <div id="app" class="flex flex-col h-screen max-w-4xl w-full mx-auto border-x border-neutral-900 bg-black shadow-2xl">
@@ -16,16 +36,16 @@
       <!-- Header -->
       <header id="header" class="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-black/90 backdrop-blur sticky top-0 z-20">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 bg-white text-black font-black text-sm rounded flex items-center justify-center tracking-tight shadow-sm">
+          <div class="w-9 h-9 bg-white text-black font-black text-sm rounded flex items-center justify-center tracking-tight shadow-sm font-sans">
             H
           </div>
           <div>
-            <h1 class="text-sm font-semibold tracking-wide uppercase text-white">Hidani Job Assistant</h1>
-            <div class="text-xs text-neutral-400 font-medium">AI-powered job matching &amp; applications</div>
+            <h1 class="text-sm font-semibold tracking-wide uppercase text-white font-sans">Hidani Job Assistant</h1>
+            <div class="text-xs text-neutral-400 font-medium font-sans">AI powered job matching and applications</div>
           </div>
         </div>
         <div>
-          <span id="resume-badge" class="hidden text-xs font-mono font-medium px-2.5 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 uppercase tracking-wider">
+          <span id="resume-badge" class="hidden text-xs font-medium px-2.5 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 uppercase tracking-wider font-sans">
             Resume Loaded
           </span>
         </div>
@@ -46,13 +66,13 @@
           <input
             id="msg-input"
             type="text"
-            placeholder="Ask anything — 'find frontend jobs', 'show remote roles', 'apply to 1, 2'…"
+            placeholder="Ask anything: 'find frontend jobs', 'show remote roles', 'apply to 1, 2'..."
             autocomplete="off"
             spellcheck="false"
             maxlength="2000"
             class="flex-1 bg-transparent border-0 outline-none px-2 py-1.5 text-sm text-neutral-100 placeholder-neutral-500 font-sans"
           />
-          <button id="send-btn" type="button" class="px-4 py-2 bg-white text-black hover:bg-neutral-200 text-xs font-semibold rounded uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+          <button id="send-btn" type="button" class="px-4 py-2 bg-white text-black hover:bg-neutral-200 text-xs font-semibold rounded uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-sans">
             Send
           </button>
         </div>
