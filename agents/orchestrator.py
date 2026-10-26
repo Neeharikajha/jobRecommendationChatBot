@@ -16,6 +16,14 @@ _SESSION_APP_MAP  = "last_app_map"   # {display_num_str: application_db_id}
 def classify_intent(user_text: str) -> str:
     text = user_text.lower()
 
+    # Normalize common apply typos so later checks catch them
+    apply_typos = ["applu", "aply", "applie", "appyl", "applu"]
+    for typo in apply_typos:
+        text = text.replace(typo, "apply")
+
+    # Normalize common history/application typos
+    text = text.replace("hisotry", "history").replace("hsitory", "history").replace("histry", "history")
+
     # Check for remove / delete / withdraw requests first
     if any(w in text for w in ["remove", "withdraw", "delete", "cancel", "undo", "clear"]):
         if any(w in text for w in ["all", "everything", "history", "queue", "applied"]):
@@ -24,18 +32,43 @@ def classify_intent(user_text: str) -> str:
             return "remove_application"
         return "remove_application"
 
-    if any(w in text for w in ["apply to", "apply for", "apply job", "submit application", "apply"]):
-        if any(c.isdigit() for c in user_text):
-            return "apply_jobs"
-
+    # ------------------------------------------------------------------
+    # Check view_applications BEFORE apply and search:
+    # "show application history" must not trigger search (contains "show")
+    # ------------------------------------------------------------------
     if any(w in text for w in [
         "applied", "my applications", "application history",
         "where have i applied", "which jobs have i", "show applied",
-        "track", "applications"
+        "track applications", "applications", "application history",
+        "show application", "show my application"
     ]):
-        return "view_applications"
+        # Only view_applications if NOT asking to apply right now
+        if not (any(c.isdigit() for c in user_text) and any(w in text for w in ["apply to", "apply for", "apply job", "apply"])):
+            return "view_applications"
 
-    # Profile roles query check: e.g. "what roles would fit this job profile", "what roles suit me"
+    # Search / Job request indicators — used to distinguish "search" vs "apply"
+    is_job_request = any(w in text for w in [
+        "give me", "show me", "find me", "search", "suggest", "recommend",
+        "jobs", "job", "roles", "role", "doles", "dole", "positions", "openings",
+        "frontend", "backend", "fullstack", "full stack", "frotned", "frotnend",
+        "frotnned", "frontned", "developer", "engineer"
+    ])
+
+    # Check for apply ONLY if it is an actual application command and NOT a search request
+    # e.g., "apply to 1, 2", "apply job 3"
+    # whereas "give me 3 frontend jobs to apply" is a SEARCH request.
+    if any(w in text for w in ["apply to", "apply for", "apply job", "submit application", "apply"]):
+        has_digits = any(c.isdigit() for c in user_text)
+        if has_digits and not is_job_request:
+            return "apply_jobs"
+        if re.search(r'^\s*apply\b', text) and has_digits:
+            return "apply_jobs"
+        # Handle "apply yo job 3 and 4" (yo = to typo), "apply 3 4"
+        if has_digits and re.search(r'\bapply\b', text):
+            if not is_job_request:
+                return "apply_jobs"
+
+    # Profile roles query check
     if any(p in text for p in [
         "what roles", "which roles", "what jobs", "which jobs", "what position",
         "roles would fit", "roles will fit", "roles fit", "role fit", "roles suit",
@@ -51,13 +84,14 @@ def classify_intent(user_text: str) -> str:
         "search", "find", "show", "give", "get", "recommend", "suggest",
         "jobs", "job", "roles", "role", "doles", "dole", "position", "opportunities", "openings",
         "developer", "engineer", "frontend", "backend", "fullstack",
-        "full stack", "frotned", "frotnend", "frontned", "remote", "python", "react", "java", "related to",
-        "profile", "match", "more", "different"
+        "full stack", "frotned", "frotnend", "frotnned", "frontned", "remote", "python", "pyton",
+        "react", "java", "related to", "profile", "match", "more", "different"
     ]):
-        if not any(w in text for w in ["applied", "application history"]):
+        if not any(w in text for w in ["applied", "application history", "application", "applications"]):
             return "search_jobs"
 
     return "other"
+
 
 
 # Helpers
@@ -142,8 +176,69 @@ def extract_role_type(user_text: str) -> str | None:
     return None
 
 
+def normalize_job_typos(text: str) -> str:
+    norm = text.lower()
+    typos = [
+        ("frotnned", "frontend"), ("frotned", "frontend"), ("frotnend", "frontend"),
+        ("frontned", "frontend"), ("fontend", "frontend"), ("frntend", "frontend"),
+        ("frondend", "frontend"), ("pyton", "python"), ("phyton", "python"),
+        ("pyhton", "python"), ("doles", "roles"), ("dole", "role"),
+        ("fulstack", "fullstack"), ("fullstck", "fullstack"), ("fullstak", "fullstack"),
+        ("bakend", "backend"), ("backnd", "backend")
+    ]
+    for typo, fix in typos:
+        norm = re.sub(rf'\b{typo}\b', fix, norm)
+    return norm
+
+
+def parse_compound_job_queries(user_text: str) -> list[dict] | None:
+    """
+    Detect queries requesting multiple specific role counts, e.g.:
+    'give me 3 frotnned jobs and 2 fullstack role to apply'
+    'give me 4 fullstack roles and 2 pyton developer roles please'
+    Returns a list of dicts: [{'count': int, 'role_type': str, 'keyword': str, 'desc': str}, ...]
+    """
+    norm = normalize_job_typos(user_text)
+    pattern = r'(\d+)\s+([a-zA-Z\s]+?)(?:jobs?|roles?|positions?|openings?)\b'
+    matches = re.findall(pattern, norm)
+    if len(matches) >= 2:
+        reqs = []
+        for count_str, desc in matches:
+            count = int(count_str)
+            desc_clean = desc.strip().lower()
+
+            rt = None
+            kw = None
+
+            if "frontend" in desc_clean:
+                rt = "frontend"
+            elif "fullstack" in desc_clean or "full stack" in desc_clean:
+                rt = "fullstack"
+            elif "backend" in desc_clean:
+                rt = "backend"
+            elif "python" in desc_clean:
+                rt = "python"
+                kw = "python"
+            elif "react" in desc_clean:
+                rt = "frontend"
+                kw = "react"
+            elif "devops" in desc_clean:
+                rt = "devops"
+            else:
+                kw = desc_clean
+
+            reqs.append({
+                "count": count,
+                "desc": desc_clean,
+                "role_type": rt,
+                "keyword": kw,
+            })
+        return reqs
+    return None
+
+
 def extract_skills_filter(user_text: str) -> list | None:
-    t = user_text.lower()
+    t = normalize_job_typos(user_text)
     known = [
         "react", "angular", "vue", "javascript", "typescript", "html", "css",
         "python", "java", "node", "express", "django", "fastapi", "spring",
@@ -152,6 +247,7 @@ def extract_skills_filter(user_text: str) -> list | None:
     ]
     found = [s for s in known if re.search(rf'\b{re.escape(s)}\b', t)]
     return found if found else None
+
 
 
 # Main agent
@@ -376,33 +472,75 @@ def run_agent(sid: str, user_text: str, request=None) -> dict:
                 result["reply"] = "Please upload your resume first so I can find matching jobs."
             else:
                 remote_only = "remote" in user_text.lower()
-                limit = extract_limit(user_text)
-                role_type = extract_role_type(user_text)
-                skills_filter = extract_skills_filter(user_text)
+                compound_reqs = parse_compound_job_queries(user_text)
 
-                if role_type and skills_filter:
-                    role_kws = {"frontend", "backend", "fullstack", "devops", "mobile"}
-                    skills_filter = [s for s in skills_filter if s not in role_kws] or None
+                if compound_reqs:
+                    log.info(f"Compound search query detected: {compound_reqs}")
+                    combined_jobs = []
+                    seen_job_ids = set()
 
-                log.info(f"Search: remote={remote_only}, role_type={role_type}, skills={skills_filter}, limit={limit}")
+                    for req in compound_reqs:
+                        c_limit = req["count"]
+                        c_rt = req["role_type"]
+                        c_kw = req["keyword"]
 
-                search_result = search_jobs(
-                    resume_data,
-                    remote=remote_only if remote_only else None,
-                    skills=skills_filter,
-                    role_type=role_type,
-                    limit=limit,
-                    exp_filter=True,
-                )
+                        sr = search_jobs(
+                            resume_data,
+                            remote=remote_only if remote_only else None,
+                            role_type=c_rt,
+                            keyword=c_kw if (not c_rt or c_rt == "python") else None,
+                            limit=c_limit + 5,
+                            exp_filter=True,
+                        )
+                        added_for_req = 0
+                        for j in sr.get("jobs", []):
+                            jid = j["job_id"]
+                            if jid not in seen_job_ids:
+                                seen_job_ids.add(jid)
+                                combined_jobs.append(j)
+                                added_for_req += 1
+                                if added_for_req >= c_limit:
+                                    break
 
-                if search_result["count"] == 0:
-                    desc = role_type or (skills_filter[0] if skills_filter else "matching")
+                    jobs = combined_jobs
+                    search_count = len(jobs)
+                else:
+                    limit = extract_limit(user_text)
+                    role_type = extract_role_type(user_text)
+                    skills_filter = extract_skills_filter(user_text)
+
+                    if role_type and skills_filter:
+                        role_kws = {"frontend", "backend", "fullstack", "devops", "mobile"}
+                        skills_filter = [s for s in skills_filter if s not in role_kws] or None
+
+                    log.info(f"Search: remote={remote_only}, role_type={role_type}, skills={skills_filter}, limit={limit}")
+
+                    search_result = search_jobs(
+                        resume_data,
+                        remote=remote_only if remote_only else None,
+                        skills=skills_filter,
+                        role_type=role_type,
+                        limit=limit,
+                        exp_filter=True,
+                    )
+                    jobs = search_result.get("jobs", [])
+                    search_count = search_result.get("count", len(jobs))
+
+                if search_count == 0 or not jobs:
+                    desc = "matching"
+                    if compound_reqs:
+                        desc = " + ".join(r["desc"] for r in compound_reqs)
+                    elif role_type:
+                        desc = role_type
+                    elif skills_filter:
+                        desc = skills_filter[0]
+
                     result["reply"] = (
                         f"No {desc} jobs found matching your profile right now. "
                         "Try different keywords or broaden your search."
                     )
                 else:
-                    jobs = search_result["jobs"]
+
 
                     # Clean any hyphens in job titles
                     for job in jobs:
@@ -424,10 +562,11 @@ def run_agent(sid: str, user_text: str, request=None) -> dict:
                     result["type"] = "jobs"
                     result["jobs"] = jobs
                     result["reply"] = (
-                        f"Found {search_result['count']} job(s) matching your profile. "
+                        f"Found {search_count} job(s) matching your profile. "
                         f"Click any card to expand details. "
                         f"To apply, type: 'apply to {apply_hint}'"
                     )
+
 
         # Fallback / Question answering
         else:

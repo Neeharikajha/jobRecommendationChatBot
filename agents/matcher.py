@@ -168,6 +168,13 @@ def search_jobs(
                         matches_any_role = True
                         break
 
+                elif rt == "python":
+                    is_py = "python" in job_title_lower
+                    is_not_fs = not any(k in job_title_lower for k in ["fullstack", "full stack"])
+                    if is_py and is_not_fs:
+                        matches_any_role = True
+                        break
+
                 elif rt == "mobile":
                     if job_rt == "mobile" or any(k in job_title_lower for k in ["mobile", "android", "ios", "flutter", "react native"]):
                         matches_any_role = True
