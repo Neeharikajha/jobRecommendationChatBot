@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build:css": "tailwindcss -i frontend/src/styles.css -o static/dist/styles.css --minify",
+    "build:css": "npx @tailwindcss/cli -i frontend/src/styles.css -o static/dist/styles.css --minify",
     "build:js": "esbuild frontend/src/main.ts --bundle --outfile=static/dist/main.js --minify",
     "build": "npm run build:css && npm run build:js",
     "typecheck": "tsc --noEmit"

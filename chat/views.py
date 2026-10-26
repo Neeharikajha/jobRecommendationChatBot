@@ -13,7 +13,7 @@ def sid(request) -> str:
 
 
 class Base(APIView):
-    authentication_classes = []   # no auth required; session cookie identifies the user
+    authentication_classes = []
     permission_classes = []
 
 
@@ -39,5 +39,6 @@ class ChatView(Base):
             return Response({"error": "Message is empty."}, status=400)
         if len(msg) > 2000:
             return Response({"error": "Message too long (max 2000 characters)."}, status=400)
-        # Pass the full request so orchestrator can read/write the session job map
-        return Response({"reply": run_agent(sid(request), msg, request=request)})
+        # run_agent now returns a dict: {reply, type, jobs, applications}
+        result = run_agent(sid(request), msg, request=request)
+        return Response(result)
